@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analysis Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0b0f19;
+            /* Deep dark blue/black */
+            color: #e2e8f0;
+        }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.4);
+        }
+
+        /* Message Bubbles */
+        .msg-bubble {
+            max-width: 80%;
+            position: relative;
+        }
+
+        .msg-sent {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-received {
+            background: rgba(51, 65, 85, 0.8);
+            border-bottom-left-radius: 2px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex overflow-hidden selection:bg-blue-500/30">
+
+    <!-- Sidebar -->
+    <div class="w-80 glass-panel border-r-0 flex flex-col z-20">
+        <!-- Brand -->
+        <div class="p-6 pb-4">
+            <h1
+                class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 tracking-tight">
+                Nexus Analyzer
+            </h1>
+            <div id="auth-status" class="text-xs mt-2 font-medium flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="px-6 py-2">
+            <button onclick="syncChats()"
+                class="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 hover:text-white border border-blue-500/30 text-sm font-medium py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group">
+                <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
+                </svg>
+                Sync Conversations
+            </button>
+        </div>
+
+        <!-- Chat List -->
+        <div class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Chats</div>
+        <div id="chat-list" class="flex-1 overflow-y-auto px-4 space-y-1 pb-4">
+            <!-- Chat items injected here -->
+            <div class="text-center text-gray-600 mt-10 text-sm italic">No chats loaded</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col relative">
+        <!-- Top Gradient Overlay for subtle ambient light -->
+        <div
+            class="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none">
+        </div>
+
+        <!-- Empty State (Initial) -->
+        <div id="empty-state" class="absolute inset-0 flex items-center justify-center text-gray-500 z-0">
+            <div class="text-center">
+                <div class="text-6xl mb-4 opacity-20">👋</div>
+                <h3 class="text-xl font-medium text-gray-400">Select a conversation to begin analysis</h3>
+            </div>
+        </div>
+
+        <!-- Dashboard Content (Hidden by default) -->
+        <div id="dashboard-content"
+            class="flex-1 flex flex-col h-full z-10 hidden opacity-0 transition-opacity duration-500">
+
+            <!-- Header Bar -->
+            <div
+                class="h-16 border-b border-gray-800/50 flex items-center justify-between px-8 bg-slate-900/50 backdrop-blur-sm">
+                <div class="flex items-center gap-4">
+                    <div id="header-avatar"
+                        class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-purple-500/20">
+                        ?
+                    </div>
+                    <h2 id="current-chat-title" class="text-lg font-semibold text-gray-100">Chat Title</h2>
+                </div>
+                <!-- Controls or Filters could go here -->
+            </div>
+
+            <!-- Scrollable Analysis Area -->
+            <div class="flex-1 overflow-y-auto p-8 space-y-6">
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Sentiment Card -->
+                    <div class="glass-card rounded-xl p-5 relative overflow-hidden group">
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <svg class="w-16 h-16 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                    d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z">
+                                </path>
+                            </svg>
+                        </div>
+                        <div class="text-sm text-gray-400 font-medium mb-1">Detailed Sentiment</div>
+                        <div class="flex items-end gap-2">
+                            <div id="metric-sentiment" class="text-3xl font-bold text-emerald-400">0.00</div>
+                            <div id="metric-tone"
+                                class="text-sm font-medium text-gray-500 mb-1 px-2 py-0.5 rounded bg-white/5">Neutral
+                            </div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">Average positivity score</div>
+                    </div>
+
+                    <!-- Urgency Card -->
+                    <div class="glass-card rounded-xl p-5 relative overflow-hidden group">
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <svg class="w-16 h-16 text-rose-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="text-sm text-gray-400 font-medium mb-1">Urgency Level</div>
+                        <div class="flex items-end gap-2">
+                            <div id="metric-urgency" class="text-3xl font-bold text-rose-400">0%</div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">Based on speed & keywords</div>
+                    </div>
+
+                    <!-- Engagement Card -->
+                    <div class="glass-card rounded-xl p-5 relative overflow-hidden group">
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <svg class="w-16 h-16 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="text-sm text-gray-400 font-medium mb-1">Interaction Count</div>
+                        <div class="flex items-end gap-2">
+                            <div id="metric-msgs" class="text-3xl font-bold text-blue-300">0</div>
+                            <div class="text-sm text-gray-500 mb-1">msgs analysed</div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">Last 50 messages</div>
+                    </div>
+                </div>
+
+                <!-- Chart Section -->
+                <div class="glass-panel rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wide">Emotional Drift &
+                            Intensity</h3>
+
+                        <!-- Custom Legend -->
+                        <div class="flex gap-4 text-xs font-medium">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Urgency
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Positive Sentiment
+                            </div>
+                            <div class="flex items-center gap-1.5 opacity-50">
+                                <span class="w-2.5 h-2.5 rounded-full bg-gray-500"></span> Neutral Base
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Messages Stream -->
+                <div>
+                    <h3
+                        class="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-4 sticky top-0 bg-slate-900/90 py-2 backdrop-blur z-10 pl-20">
+                        Conversation Log</h3>
+                    <div id="message-list" class="space-y-4 pb-10">
+                        <!-- Messages rendered here -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal (Styled) -->
+    <div id="login-modal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center hidden z-50">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-md border border-gray-700 shadow-2xl">
+            <div class="text-center mb-6">
+                <div
+                    class="w-12 h-12 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                        </path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-white">Authentication Required</h2>
+                <p class="text-sm text-gray-400 mt-2">Connect your Telegram account to begin analysis</p>
+            </div>
+
+            <div id="step-phone">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Phone Number</label>
+                <input type="text" id="phone-input" placeholder="+1234567890"
+                    class="w-full bg-slate-900/50 border border-gray-600 rounded-lg p-3 mb-4 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-600">
+                <button onclick="sendCode()"
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg transition-all shadow-lg shadow-blue-600/20">
+                    Send Verification Code
+                </button>
+            </div>
+
+            <div id="step-code" class="hidden">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">One-Time Password</label>
+                <input type="text" id="code-input" placeholder="12345"
+                    class="w-full bg-slate-900/50 border border-gray-600 rounded-lg p-3 mb-4 text-white focus:outline-none focus:border-blue-500 text-center tracking-widest text-lg">
+
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">2FA Password (Optional)</label>
+                <input type="password" id="password-input" placeholder="••••••"
+                    class="w-full bg-slate-900/50 border border-gray-600 rounded-lg p-3 mb-6 text-white focus:outline-none focus:border-blue-500">
+
+                <button onclick="verifyCode()"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-lg transition-all shadow-lg shadow-emerald-600/20">
+                    Verify & Connect
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
